@@ -13,6 +13,12 @@ interface ControlsPanelProps {
   setTimeScale: (n: number) => void;
   velocityScale: number;
   setVelocityScale: (n: number) => void;
+  fragmentOnCollision: boolean;
+  setFragmentOnCollision: (v: boolean) => void;
+  gameOverOnCollision: boolean;
+  setGameOverOnCollision: (v: boolean) => void;
+  selectedBodyId: string | null;
+  onSelectBody: (id: string | null) => void;
   onTogglePlay: () => void;
   onGenerate: () => void;
   onPerturb: () => void;
@@ -32,6 +38,12 @@ export const ControlsPanel = ({
   setTimeScale,
   velocityScale,
   setVelocityScale,
+  fragmentOnCollision,
+  setFragmentOnCollision,
+  gameOverOnCollision,
+  setGameOverOnCollision,
+  selectedBodyId,
+  onSelectBody,
   onTogglePlay,
   onGenerate,
   onPerturb,
@@ -137,30 +149,64 @@ export const ControlsPanel = ({
         />
       </div>
 
+      <div className="space-y-3 pt-4 border-t border-slate-800">
+        <h3 className="text-sm font-medium text-slate-300">Collision Rules</h3>
+        
+        <label className="flex items-center gap-2 text-sm cursor-pointer hover:text-white transition-colors">
+          <input 
+            type="checkbox" 
+            checked={fragmentOnCollision}
+            onChange={(e) => setFragmentOnCollision(e.target.checked)}
+            className="rounded border-slate-700 bg-slate-800 text-indigo-500 focus:ring-indigo-500"
+          />
+          Fragmentation on Collision
+        </label>
+        
+        <label className="flex items-center gap-2 text-sm cursor-pointer hover:text-white transition-colors">
+          <input 
+            type="checkbox" 
+            checked={gameOverOnCollision}
+            onChange={(e) => setGameOverOnCollision(e.target.checked)}
+            className="rounded border-slate-700 bg-slate-800 text-red-500 focus:ring-red-500"
+          />
+          Game Over on Collision
+        </label>
+      </div>
+
       <div className="border-t border-slate-800 pt-4">
         <h3 className="text-sm font-medium mb-4 text-slate-300">Celestial Bodies</h3>
         <div className="space-y-4">
-          {bodies.map((body, idx) => (
-            <div key={body.id} className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: body.color }} />
-                  <span className="text-xs font-medium">Body {idx + 1}</span>
+          {bodies.map((body, idx) => {
+            const isSelected = selectedBodyId === body.id;
+            return (
+              <div 
+                key={body.id} 
+                className={`p-3 rounded-lg border transition-colors cursor-pointer ${
+                  isSelected ? 'bg-indigo-500/20 border-indigo-500/50' : 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-800'
+                }`}
+                onClick={() => onSelectBody(isSelected ? null : body.id)}
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: body.color }} />
+                    <span className="text-xs font-medium">Body {idx + 1}</span>
+                  </div>
+                  <span className="text-xs font-mono text-slate-400">m: {body.mass.toFixed(1)}</span>
                 </div>
-                <span className="text-xs font-mono text-slate-400">m: {body.mass.toFixed(1)}</span>
+                
+                <input
+                  type="range"
+                  min="0.1"
+                  max="20"
+                  step="0.1"
+                  value={body.mass}
+                  onChange={(e) => onUpdateMass(body.id, parseFloat(e.target.value))}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full accent-slate-400"
+                />
               </div>
-              
-              <input
-                type="range"
-                min="0.1"
-                max="20"
-                step="0.1"
-                value={body.mass}
-                onChange={(e) => onUpdateMass(body.id, parseFloat(e.target.value))}
-                className="w-full accent-slate-400"
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

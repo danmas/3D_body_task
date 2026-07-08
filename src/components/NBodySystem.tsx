@@ -1,5 +1,5 @@
-import React, { useRef, useMemo, useEffect, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import React, { useRef, useEffect, useState, useMemo } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { RigidBody, RapierRigidBody, useBeforePhysicsStep } from "@react-three/rapier";
 import * as THREE from "three";
 import { CelestialBody } from "../types";
@@ -11,39 +11,68 @@ interface TrajectoryProps {
   color: string;
 }
 
+const MAX_TRAJECTORY_POINTS = 500;
+
 const TrajectoryLine = ({ pointsRef, color }: TrajectoryProps) => {
   const geometryRef = useRef<THREE.BufferGeometry>(null);
+  const positions = useMemo(() => new Float32Array(MAX_TRAJECTORY_POINTS * 3), []);
 
   useFrame(() => {
-    if (geometryRef.current && pointsRef.current.length > 1) {
-      geometryRef.current.setFromPoints(pointsRef.current);
+    if (geometryRef.current && pointsRef.current.length > 0) {
+      const posAttr = geometryRef.current.attributes.position as THREE.BufferAttribute;
+      const posArray = posAttr.array as Float32Array;
+      const count = Math.min(pointsRef.current.length, MAX_TRAJECTORY_POINTS);
+      // Take the last `count` points if we have more than MAX_TRAJECTORY_POINTS
+      const startIndex = Math.max(0, pointsRef.current.length - MAX_TRAJECTORY_POINTS);
+      for (let i = 0; i < count; i++) {
+        const point = pointsRef.current[startIndex + i];
+        posArray[i * 3] = point.x;
+        posArray[i * 3 + 1] = point.y;
+        posArray[i * 3 + 2] = point.z;
+      }
+      posAttr.needsUpdate = true;
+      geometryRef.current.setDrawRange(0, count);
     }
   });
 
   return (
     <line>
-      <bufferGeometry ref={geometryRef} />
+      <bufferGeometry ref={geometryRef}>
+        <bufferAttribute
+          attach="attributes-position"
+          count={MAX_TRAJECTORY_POINTS}
+          array={positions}
+          itemSize={3}
+          usage={THREE.DynamicDrawUsage}
+        />
+      </bufferGeometry>
       <lineBasicMaterial color={color} opacity={0.6} transparent linewidth={2} />
     </line>
   );
 };
 
-const VelocityArrow = ({ bodyId, bodyRefs, color }: { bodyId: string, bodyRefs: React.MutableRefObject<Record<string, RapierRigidBody | null>>, color: string }) => {
+const VelocityArrow = ({ body, bodyRefs, isRunning }: { body: CelestialBody, bodyRefs: React.MutableRefObject<Record<string, RapierRigidBody | null>>, isRunning: boolean }) => {
   const arrowRef = useRef<THREE.ArrowHelper>(null);
 
   useFrame(() => {
-    const rb = bodyRefs.current[bodyId];
+    const rb = bodyRefs.current[body.id];
     if (arrowRef.current && rb) {
-      const vel = rb.linvel();
       const pos = rb.translation();
+      let v: THREE.Vector3;
+
+      if (isRunning) {
+        const vel = rb.linvel();
+        v = new THREE.Vector3(vel.x, vel.y, vel.z);
+      } else {
+        v = new THREE.Vector3(...body.initialVelocity);
+      }
       
-      const v = new THREE.Vector3(vel.x, vel.y, vel.z);
       const length = v.length();
       
       arrowRef.current.position.set(pos.x, pos.y, pos.z);
       
       if (length > 0.01) {
-        arrowRef.current.setDirection(v.normalize());
+        arrowRef.current.setDirection(v.clone().normalize());
         // Scale the arrow length down a bit so it's not too huge
         arrowRef.current.setLength(length * 0.5, Math.min(length * 0.1, 1), Math.min(length * 0.05, 0.5));
         arrowRef.current.visible = true;
@@ -53,7 +82,7 @@ const VelocityArrow = ({ bodyId, bodyRefs, color }: { bodyId: string, bodyRefs: 
     }
   });
 
-  return <arrowHelper ref={arrowRef} args={[new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 1, color]} />;
+  return <arrowHelper ref={arrowRef} args={[new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 1, body.color]} />;
 };
 
 interface BodySystemProps {
@@ -61,6 +90,7 @@ interface BodySystemProps {
   isRunning: boolean;
   showTrajectories: boolean;
   showVelocities?: boolean;
+  selectedBodyId?: string | null;
   onCollision?: (
     id1: string,
     id2: string,
@@ -71,8 +101,9 @@ interface BodySystemProps {
   ) => void;
 }
 
-export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocities = true, onCollision }: BodySystemProps) => {
+export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocities = true, selectedBodyId, onCollision }: BodySystemProps) => {
   const bodyRefs = useRef<Record<string, RapierRigidBody | null>>({});
+  const { camera, controls } = useThree();
   
   // Keep track of trajectories without triggering React renders
   const trajectories = useRef<Record<string, THREE.Vector3[]>>({});
@@ -150,6 +181,17 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
     }
   });
 
+  useFrame(() => {
+    if (selectedBodyId && controls && (controls as any).target) {
+      const rb = bodyRefs.current[selectedBodyId];
+      if (rb) {
+        const p = rb.translation();
+        (controls as any).target.lerp(new THREE.Vector3(p.x, p.y, p.z), 0.1);
+        (controls as any).update();
+      }
+    }
+  });
+
   return (
     <>
       {bodies.map((body) => (
@@ -157,9 +199,13 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
           key={body.id}
           name={body.id}
           ref={(ref) => {
-            bodyRefs.current[body.id] = ref;
+            if (ref) {
+              bodyRefs.current[body.id] = ref;
+            } else {
+              delete bodyRefs.current[body.id];
+            }
           }}
-          type={isRunning ? "dynamic" : "kinematicPosition"}
+          type="dynamic"
           position={body.initialPosition}
           linearVelocity={body.initialVelocity}
           mass={body.mass}
@@ -211,7 +257,7 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
       })}
 
       {showVelocities && bodies.map((body) => (
-        <VelocityArrow key={`vel-${body.id}`} bodyId={body.id} bodyRefs={bodyRefs} color={body.color} />
+        <VelocityArrow key={`vel-${body.id}`} body={body} bodyRefs={bodyRefs} isRunning={isRunning} />
       ))}
     </>
   );
