@@ -159,7 +159,7 @@ export const ControlsPanel = ({
         <input
           type="range"
           min="0.1"
-          max="50"
+          max="500"
           step="0.1"
           value={gravityScale}
           onChange={(e) => setGravityScale(parseFloat(e.target.value))}

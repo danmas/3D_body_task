@@ -11,23 +11,29 @@ export const COLORS = [
   "#06b6d4", // cyan
 ];
 
-export const generateRandomBodies = (count: number, velocityScale: number = 1): CelestialBody[] => {
+export const generateRandomBodies = (count: number, velocityScale: number = 1, gravityScale: number = 1): CelestialBody[] => {
   const bodies: CelestialBody[] = [];
   let totalMass = 0;
   const com = new THREE.Vector3();
 
   // First pass: generate masses and positions
   for (let i = 0; i < count; i++) {
-    const mass = Math.random() * 5 + 1; // 1 to 6
+    const isStar = i === 0;
+    const mass = isStar ? 500 : Math.random() * 5 + 1; // Heavy star, small planets
     totalMass += mass;
-    const radius = Math.cbrt(mass) * 0.5; // Roughly proportional to mass
+    const radius = isStar ? 3 : Math.cbrt(mass) * 0.5;
     
-    // Spread out initial positions to prevent immediate collisions
-    const pos = new THREE.Vector3(
-      (Math.random() - 0.5) * 40,
-      (Math.random() - 0.5) * 10, // Flatter system initially
-      (Math.random() - 0.5) * 40
+    // Star in the center, planets spread out
+    const pos = isStar ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(
+      (Math.random() - 0.5) * 60,
+      (Math.random() - 0.5) * 5, // Very flat system
+      (Math.random() - 0.5) * 60
     );
+    
+    // Prevent planets from being too close to the star
+    if (!isStar && pos.length() < 10) {
+      pos.normalize().multiplyScalar(10 + Math.random() * 10);
+    }
 
     bodies.push({
       id: `body-${i}-${Date.now()}`,
@@ -35,7 +41,7 @@ export const generateRandomBodies = (count: number, velocityScale: number = 1): 
       radius,
       initialPosition: [pos.x, pos.y, pos.z],
       initialVelocity: [0, 0, 0],
-      color: COLORS[i % COLORS.length],
+      color: isStar ? "#fbbf24" : COLORS[i % COLORS.length],
     });
 
     com.add(pos.clone().multiplyScalar(mass));
@@ -45,7 +51,7 @@ export const generateRandomBodies = (count: number, velocityScale: number = 1): 
   com.divideScalar(totalMass);
 
   // Second pass: assign orbital velocities around the center of mass
-  const G = 50; // Gravitational constant used in the simulation
+  const G = 50 * gravityScale; // Gravitational constant used in the simulation
   const up = new THREE.Vector3(0, 1, 0).normalize(); // Orbit plane normal
 
   for (let i = 0; i < count; i++) {

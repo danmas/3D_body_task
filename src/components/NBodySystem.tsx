@@ -162,6 +162,8 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
           totalForce.add(forceDir.multiplyScalar(forceMagnitude));
         }
         
+        // removed log
+        
         rb1.addForce(totalForce, true);
       } catch (e) {
         // Safe catch for invalid rigid bodies

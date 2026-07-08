@@ -29,7 +29,7 @@ export default function App() {
 
   // Initialize on first mount
   useEffect(() => {
-    setBodies(generateRandomBodies(bodyCount, velocityScale));
+    setBodies(generateRandomBodies(bodyCount, velocityScale, gravityScale));
     setSelectedBodyId(null);
   }, []);
 
@@ -46,7 +46,7 @@ export default function App() {
     setIsRunning(false);
     setIsGameOver(false);
     setSelectedBodyId(null);
-    setBodies(generateRandomBodies(bodyCount, velocityScale));
+    setBodies(generateRandomBodies(bodyCount, velocityScale, gravityScale));
   };
 
   const handlePerturb = () => {
