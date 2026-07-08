@@ -21,6 +21,7 @@ export default function App() {
   const [showVelocities, setShowVelocities] = useState(true);
   const [timeScale, setTimeScale] = useState(1);
   const [velocityScale, setVelocityScale] = useState(1);
+  const [gravityScale, setGravityScale] = useState(1);
   const [fragmentOnCollision, setFragmentOnCollision] = useState(true);
   const [gameOverOnCollision, setGameOverOnCollision] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
@@ -114,6 +115,7 @@ export default function App() {
                 isRunning={isRunning} 
                 showTrajectories={showTrajectories}
                 showVelocities={showVelocities}
+                gravityScale={gravityScale}
                 onCollision={handleCollision}
                 selectedBodyId={selectedBodyId}
               />
@@ -143,18 +145,20 @@ export default function App() {
         )}
       </div>
 
-      <ControlsPanel
-        bodies={bodies}
-        isRunning={isRunning}
-        showTrajectories={showTrajectories}
-        showVelocities={showVelocities}
-        bodyCount={bodyCount}
-        setBodyCount={setBodyCount}
-        timeScale={timeScale}
-        setTimeScale={setTimeScale}
-        velocityScale={velocityScale}
-        setVelocityScale={setVelocityScale}
-        fragmentOnCollision={fragmentOnCollision}
+        <ControlsPanel
+          bodies={bodies}
+          isRunning={isRunning}
+          showTrajectories={showTrajectories}
+          showVelocities={showVelocities}
+          bodyCount={bodyCount}
+          setBodyCount={setBodyCount}
+          timeScale={timeScale}
+          setTimeScale={setTimeScale}
+          velocityScale={velocityScale}
+          setVelocityScale={setVelocityScale}
+          gravityScale={gravityScale}
+          setGravityScale={setGravityScale}
+          fragmentOnCollision={fragmentOnCollision}
         setFragmentOnCollision={setFragmentOnCollision}
         gameOverOnCollision={gameOverOnCollision}
         setGameOverOnCollision={setGameOverOnCollision}

@@ -94,6 +94,7 @@ interface BodySystemProps {
   isRunning: boolean;
   showTrajectories: boolean;
   showVelocities?: boolean;
+  gravityScale?: number;
   selectedBodyId?: string | null;
   onCollision?: (
     id1: string,
@@ -105,7 +106,7 @@ interface BodySystemProps {
   ) => void;
 }
 
-export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocities = true, selectedBodyId, onCollision }: BodySystemProps) => {
+export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocities = true, gravityScale = 1, selectedBodyId, onCollision }: BodySystemProps) => {
   const bodyRefs = useRef<Record<string, RapierRigidBody | null>>({});
   const { camera, controls } = useThree();
   
@@ -155,7 +156,7 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
           // Increased softening to prevent extreme slingshots when bodies get close
           const softDistSq = distanceSq + 15.0; 
           
-          const forceMagnitude = (G * b1.mass * b2.mass) / softDistSq;
+          const forceMagnitude = (G * gravityScale * b1.mass * b2.mass) / softDistSq;
           const forceDir = distVec.normalize();
           
           totalForce.add(forceDir.multiplyScalar(forceMagnitude));
@@ -267,19 +268,23 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
               const rb1 = bodyRefs.current[body.id];
               const rb2 = bodyRefs.current[otherId];
               if (rb1 && rb2) {
-                const p1 = rb1.translation();
-                const v1 = rb1.linvel();
-                const p2 = rb2.translation();
-                const v2 = rb2.linvel();
-                
-                onCollision?.(
-                  body.id,
-                  otherId,
-                  new THREE.Vector3(p1.x, p1.y, p1.z),
-                  new THREE.Vector3(v1.x, v1.y, v1.z),
-                  new THREE.Vector3(p2.x, p2.y, p2.z),
-                  new THREE.Vector3(v2.x, v2.y, v2.z)
-                );
+                try {
+                  const p1 = rb1.translation();
+                  const v1 = rb1.linvel();
+                  const p2 = rb2.translation();
+                  const v2 = rb2.linvel();
+                  
+                  onCollision?.(
+                    body.id,
+                    otherId,
+                    new THREE.Vector3(p1.x, p1.y, p1.z),
+                    new THREE.Vector3(v1.x, v1.y, v1.z),
+                    new THREE.Vector3(p2.x, p2.y, p2.z),
+                    new THREE.Vector3(v2.x, v2.y, v2.z)
+                  );
+                } catch (e) {
+                  // Safe catch for bodies in destruction
+                }
               }
             }
           }}

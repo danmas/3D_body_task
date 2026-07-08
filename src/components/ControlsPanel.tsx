@@ -13,6 +13,8 @@ interface ControlsPanelProps {
   setTimeScale: (n: number) => void;
   velocityScale: number;
   setVelocityScale: (n: number) => void;
+  gravityScale: number;
+  setGravityScale: (n: number) => void;
   fragmentOnCollision: boolean;
   setFragmentOnCollision: (v: boolean) => void;
   gameOverOnCollision: boolean;
@@ -38,6 +40,8 @@ export const ControlsPanel = ({
   setTimeScale,
   velocityScale,
   setVelocityScale,
+  gravityScale,
+  setGravityScale,
   fragmentOnCollision,
   setFragmentOnCollision,
   gameOverOnCollision,
@@ -145,6 +149,20 @@ export const ControlsPanel = ({
           step="0.1"
           value={velocityScale}
           onChange={(e) => setVelocityScale(parseFloat(e.target.value))}
+          className="w-full accent-indigo-500"
+        />
+
+        <div className="flex justify-between items-center mt-4">
+          <label className="text-sm font-medium">Gravity Multiplier</label>
+          <span className="text-sm font-mono text-indigo-400">{gravityScale.toFixed(1)}x</span>
+        </div>
+        <input
+          type="range"
+          min="0.1"
+          max="50"
+          step="0.1"
+          value={gravityScale}
+          onChange={(e) => setGravityScale(parseFloat(e.target.value))}
           className="w-full accent-indigo-500"
         />
       </div>
