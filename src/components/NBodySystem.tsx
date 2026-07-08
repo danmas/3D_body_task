@@ -1,10 +1,9 @@
 import React, { useRef, useEffect, useState, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { RigidBody, RapierRigidBody, useBeforePhysicsStep } from "@react-three/rapier";
+import { RigidBody, RapierRigidBody, useBeforePhysicsStep, useRapier } from "@react-three/rapier";
 import * as THREE from "three";
 import { CelestialBody } from "../types";
-
-const G = 50; // Gravitational constant for simulation
+import { PHYSICS_G } from "../constants";
 
 interface TrajectoryProps {
   pointsRef: React.MutableRefObject<THREE.Vector3[]>;
@@ -109,6 +108,7 @@ interface BodySystemProps {
 
 export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocities = true, gravityScale = 1, selectedBodyId, onCollision, physicsActions }: BodySystemProps) => {
   const bodyRefs = useRef<Record<string, RapierRigidBody | null>>({});
+  const { world } = useRapier();
   const { camera, controls } = useThree();
   
   // Keep track of trajectories without triggering React renders
@@ -168,6 +168,7 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
       console.log(`Config: gravityScale=${gravityScale}`);
       console.log("Logging positions and velocities (approx. every 1 real-time second)...");
       console.log("===============================");
+      fetch('/api/log/reset', { method: 'POST' }).catch(console.warn);
       hasLoggedSetup.current = true;
       frameCount.current = 0;
     }
@@ -177,6 +178,7 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
     // Log every 60 steps
     if (frameCount.current % 60 === 0) {
         let logStr = `Step ${frameCount.current}: `;
+        const logBodies: Array<{ id: string; mass: number; px: number; py: number; pz: number; vx: number; vy: number; vz: number }> = [];
         for (let i = 0; i < bodies.length; i++) {
             const b = bodies[i];
             const rb = bodyRefs.current[b.id];
@@ -184,11 +186,25 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
             try {
                 const pos = rb.translation();
                 const vel = rb.linvel();
-                // Find index to use in log
                 logStr += `[${i}] p:${pos.x.toFixed(1)},${pos.y.toFixed(1)},${pos.z.toFixed(1)} v:${vel.x.toFixed(1)},${vel.y.toFixed(1)},${vel.z.toFixed(1)} | `;
+                logBodies.push({
+                    id: b.id,
+                    mass: parseFloat(b.mass.toFixed(2)),
+                    px: parseFloat(pos.x.toFixed(2)),
+                    py: parseFloat(pos.y.toFixed(2)),
+                    pz: parseFloat(pos.z.toFixed(2)),
+                    vx: parseFloat(vel.x.toFixed(2)),
+                    vy: parseFloat(vel.y.toFixed(2)),
+                    vz: parseFloat(vel.z.toFixed(2)),
+                });
             } catch (e) {}
         }
         console.log(logStr);
+        fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ step: frameCount.current, t: Date.now(), bodies: logBodies }),
+        }).catch(console.warn);
     }
     
     // Apply gravity between all pairs of bodies
@@ -203,7 +219,8 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
         const p1 = rb1.translation();
         const pos1 = new THREE.Vector3(p1.x, p1.y, p1.z);
         
-        const totalForce = new THREE.Vector3(0, 0, 0);
+        // Accumulate gravitational acceleration: a = G*m_other/r² (mass-independent)
+        const totalAccel = new THREE.Vector3(0, 0, 0);
 
         for (let j = 0; j < keys.length; j++) {
           if (i === j) continue;
@@ -216,20 +233,20 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
 
           const distVec = pos2.clone().sub(pos1);
           const distanceSq = distVec.lengthSq();
-          
-          // Softening parameter to avoid infinite forces at zero distance
-          // Increased softening to prevent extreme slingshots when bodies get close
-          const softDistSq = distanceSq + 15.0; 
-          
-          const forceMagnitude = (G * gravityScale * b1.mass * b2.mass) / softDistSq;
-          const forceDir = distVec.normalize();
-          
-          totalForce.add(forceDir.multiplyScalar(forceMagnitude));
+          const softDistSq = distanceSq + 15.0;
+
+          const accel = (PHYSICS_G * gravityScale * b2.mass) / softDistSq;
+          totalAccel.add(distVec.normalize().multiplyScalar(accel));
         }
-        
-        // removed log
-        
-        rb1.addForce(totalForce, true);
+
+        // Apply directly as Δv = a * dt — bypasses Rapier's internal mass entirely
+        const dt = world.timestep;
+        const vel = rb1.linvel();
+        rb1.setLinvel({
+          x: vel.x + totalAccel.x * dt,
+          y: vel.y + totalAccel.y * dt,
+          z: vel.z + totalAccel.z * dt,
+        }, true);
       } catch (e) {
         // Safe catch for invalid rigid bodies
       }

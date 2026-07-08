@@ -1,0 +1,19 @@
+schema: spec-driven
+
+context: |
+  Tech stack: TypeScript, React 19, Vite 6, Three.js, @react-three/fiber, @react-three/drei
+  Physics: @react-three/rapier (Rapier3D WASM), @dimforge/rapier3d-compat
+  UI: Tailwind CSS v4, lucide-react, motion (Framer Motion)
+  AI integration: @google/genai (Gemini)
+  Domain: 3D N-body gravitational simulation (solar system scale)
+    - Bodies have mass, velocity, position in 3D space
+    - Physics: gravitational attraction between all bodies, collision detection
+    - Rendering: 3D spheres with trails, labels, camera controls
+    - Simulation can be paused, reset, bodies added/removed at runtime
+  Conventions: functional React components, TypeScript strict mode, no class components
+  File structure: src/App.tsx (root), src/components/, src/types.ts, src/utils.ts
+
+rules:
+  tasks:
+    - Break tasks into chunks completable in under 1 hour
+    - Each task should touch at most 2-3 files

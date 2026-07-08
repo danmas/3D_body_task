@@ -1,5 +1,14 @@
 import { CelestialBody, Vector3Tuple } from "./types";
 import * as THREE from "three";
+import {
+  PHYSICS_G,
+  ORBIT_VELOCITY_FACTOR,
+  STAR_MASS,
+  STAR_RADIUS,
+  PLANET_RADIUS_FACTOR,
+  MIN_ORBIT_DISTANCE,
+  ORBIT_SPACING,
+} from "./constants";
 
 export const COLORS = [
   "#ef4444", // red
@@ -14,25 +23,31 @@ export const COLORS = [
 export const generateRandomBodies = (count: number, velocityScale: number = 1, gravityScale: number = 1): CelestialBody[] => {
   const bodies: CelestialBody[] = [];
   let totalMass = 0;
-  const com = new THREE.Vector3();
+
+  const G = PHYSICS_G * gravityScale;
+  const up = new THREE.Vector3(0, 1, 0);
 
   // First pass: generate masses and positions
   for (let i = 0; i < count; i++) {
     const isStar = i === 0;
-    const mass = isStar ? 500 : Math.random() * 5 + 1; // Heavy star, small planets
+    const mass = isStar ? STAR_MASS : Math.random() * 5 + 1;
     totalMass += mass;
-    const radius = isStar ? 3 : Math.cbrt(mass) * 0.5;
-    
-    // Star in the center, planets spread out
-    const pos = isStar ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(
-      (Math.random() - 0.5) * 400,
-      (Math.random() - 0.5) * 10, // Very flat system
-      (Math.random() - 0.5) * 400
-    );
-    
-    // Prevent planets from being too close to the star
-    if (!isStar && pos.length() < 30) {
-      pos.normalize().multiplyScalar(30 + Math.random() * 50);
+    const radius = isStar ? STAR_RADIUS : Math.cbrt(mass) * PLANET_RADIUS_FACTOR;
+
+    let pos: THREE.Vector3;
+    if (isStar) {
+      pos = new THREE.Vector3(0, 0, 0);
+    } else {
+      // Each planet gets its own orbital ring, spaced ORBIT_SPACING apart.
+      // This guarantees radial separation, preventing close encounters.
+      const planetIdx = i - 1; // 0-based
+      const orbitRadius = MIN_ORBIT_DISTANCE + planetIdx * ORBIT_SPACING + Math.random() * 20;
+      const phi = Math.random() * Math.PI * 2; // random starting angle
+      pos = new THREE.Vector3(
+        Math.cos(phi) * orbitRadius,
+        (Math.random() - 0.5) * 2,  // nearly flat disk
+        Math.sin(phi) * orbitRadius
+      );
     }
 
     bodies.push({
@@ -43,44 +58,39 @@ export const generateRandomBodies = (count: number, velocityScale: number = 1, g
       initialVelocity: [0, 0, 0],
       color: isStar ? "#fbbf24" : COLORS[i % COLORS.length],
     });
-
-    com.add(pos.clone().multiplyScalar(mass));
   }
-  
-  // Calculate center of mass
-  com.divideScalar(totalMass);
 
-  // Second pass: assign orbital velocities around the center of mass
-  const G = 50 * gravityScale; // Gravitational constant used in the simulation
-  const up = new THREE.Vector3(0, 1, 0).normalize(); // Orbit plane normal
+  // Second pass: assign circular orbital velocities around the star
+  const starPos = new THREE.Vector3(...bodies[0].initialPosition);
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 1; i < count; i++) {
     const b = bodies[i];
     const pos = new THREE.Vector3(...b.initialPosition);
-    const rVec = pos.clone().sub(com);
+    const rVec = pos.clone().sub(starPos);
     const r = rVec.length();
-
     if (r === 0) continue;
 
-    // Approximate circular orbit velocity magnitude: v = sqrt(G * M / r)
-    // We scale it a bit for a more elliptical/stable look with multiple bodies
-    const vMag = Math.sqrt((G * totalMass) / r) * 0.85 * velocityScale;
+    // Circular orbit speed: v = sqrt(G * M_star / r)
+    const vMag = Math.sqrt((G * STAR_MASS) / r) * ORBIT_VELOCITY_FACTOR * velocityScale;
 
-    // Velocity direction perpendicular to distance vector and up vector
+    // Perpendicular to rVec in the XZ orbital plane — purely tangential, no radial component
     const vDir = new THREE.Vector3().crossVectors(up, rVec).normalize();
-    
-    // Add a tiny bit of random tilt to the orbit
-    vDir.add(new THREE.Vector3(
-      (Math.random() - 0.5) * 0.2,
-      (Math.random() - 0.5) * 0.2,
-      (Math.random() - 0.5) * 0.2
-    )).normalize();
 
-    const vel = vDir.multiplyScalar(vMag);
-
-    b.initialVelocity = [vel.x, vel.y, vel.z];
+    b.initialVelocity = vDir.multiplyScalar(vMag).toArray() as Vector3Tuple;
   }
-  
+
+  // Third pass: subtract centre-of-mass drift so total momentum = 0
+  const comVel = new THREE.Vector3();
+  bodies.forEach(b => comVel.add(new THREE.Vector3(...b.initialVelocity).multiplyScalar(b.mass)));
+  comVel.divideScalar(totalMass);
+  bodies.forEach(b => {
+    b.initialVelocity = [
+      b.initialVelocity[0] - comVel.x,
+      b.initialVelocity[1] - comVel.y,
+      b.initialVelocity[2] - comVel.z,
+    ];
+  });
+
   return bodies;
 };
 
@@ -138,7 +148,7 @@ export const createFragments = (
     
     if (mass <= 0.05) continue;
     
-    const radius = Math.cbrt(mass) * 0.5;
+    const radius = Math.cbrt(mass) * PLANET_RADIUS_FACTOR;
     
     // Spread fragments slightly so they don't overlap completely
     const offset = new THREE.Vector3(
