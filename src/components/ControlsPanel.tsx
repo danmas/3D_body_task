@@ -27,6 +27,7 @@ interface ControlsPanelProps {
   onToggleTrajectories: () => void;
   onToggleVelocities: () => void;
   onUpdateMass: (id: string, newMass: number) => void;
+  onUpdateVelocity?: (id: string, newVelocity: number) => void;
 }
 
 export const ControlsPanel = ({
@@ -54,6 +55,7 @@ export const ControlsPanel = ({
   onToggleTrajectories,
   onToggleVelocities,
   onUpdateMass,
+  onUpdateVelocity,
 }: ControlsPanelProps) => {
   return (
     <div className="w-80 bg-slate-900/80 backdrop-blur-md text-slate-100 p-6 flex flex-col gap-6 overflow-y-auto border-l border-slate-800">
@@ -204,25 +206,42 @@ export const ControlsPanel = ({
                 }`}
                 onClick={() => onSelectBody(isSelected ? null : body.id)}
               >
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex flex-col gap-2 mb-2">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: body.color }} />
-                    <span className="text-xs font-medium">Body {idx + 1}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-mono text-slate-400">m:</span>
-                    <input 
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      value={parseFloat(body.mass.toFixed(2))}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        if (!isNaN(val) && val > 0) onUpdateMass(body.id, val);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-16 bg-slate-800 text-xs text-right border border-slate-700 rounded px-1 text-slate-200 outline-none focus:border-slate-500"
-                    />
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: body.color }} />
+                    <span className="text-xs font-medium truncate flex-1">Body {idx + 1}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-mono text-slate-400">m:</span>
+                        <input 
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={parseFloat(body.mass.toFixed(2))}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val) && val > 0) onUpdateMass(body.id, val);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-14 bg-slate-800 text-xs text-right border border-slate-700 rounded px-1 text-slate-200 outline-none focus:border-slate-500"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-mono text-slate-400">v:</span>
+                        <input 
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={parseFloat(Math.sqrt(body.initialVelocity[0]**2 + body.initialVelocity[1]**2 + body.initialVelocity[2]**2).toFixed(2))}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val) && val >= 0 && onUpdateVelocity) onUpdateVelocity(body.id, val);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-14 bg-slate-800 text-xs text-right border border-slate-700 rounded px-1 text-slate-200 outline-none focus:border-slate-500"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
                 

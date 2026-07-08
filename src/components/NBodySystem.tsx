@@ -96,6 +96,7 @@ interface BodySystemProps {
   showVelocities?: boolean;
   gravityScale?: number;
   selectedBodyId?: string | null;
+  physicsActions?: React.MutableRefObject<{ updateVelocity: (id: string, mag: number) => void }>;
   onCollision?: (
     id1: string,
     id2: string,
@@ -106,7 +107,7 @@ interface BodySystemProps {
   ) => void;
 }
 
-export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocities = true, gravityScale = 1, selectedBodyId, onCollision }: BodySystemProps) => {
+export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocities = true, gravityScale = 1, selectedBodyId, onCollision, physicsActions }: BodySystemProps) => {
   const bodyRefs = useRef<Record<string, RapierRigidBody | null>>({});
   const { camera, controls } = useThree();
   
@@ -116,6 +117,35 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
 
   const frameCount = useRef(0);
   const hasLoggedSetup = useRef(false);
+
+  useEffect(() => {
+    if (physicsActions) {
+      physicsActions.current.updateVelocity = (id: string, newMag: number) => {
+        const rb = bodyRefs.current[id];
+        if (rb) {
+          const currentVel = rb.linvel();
+          const v = new THREE.Vector3(currentVel.x, currentVel.y, currentVel.z);
+          const currentMag = v.length();
+          if (currentMag > 0.001) {
+            v.normalize().multiplyScalar(newMag);
+            rb.setLinvel(v, true);
+          } else {
+             // fallback to initialVelocity direction if current is zero
+             const b = bodies.find(body => body.id === id);
+             if (b) {
+               const iv = new THREE.Vector3(...b.initialVelocity);
+               if (iv.lengthSq() > 0.0001) {
+                 iv.normalize().multiplyScalar(newMag);
+                 rb.setLinvel(iv, true);
+               } else {
+                 rb.setLinvel(new THREE.Vector3(newMag, 0, 0), true);
+               }
+             }
+          }
+        }
+      };
+    }
+  }, [physicsActions, bodies]);
 
   // Initialize trajectory arrays when bodies change
   useEffect(() => {

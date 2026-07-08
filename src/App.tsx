@@ -27,6 +27,8 @@ export default function App() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [selectedBodyId, setSelectedBodyId] = useState<string | null>(null);
 
+  const physicsActions = React.useRef<{ updateVelocity: (id: string, mag: number) => void }>({ updateVelocity: () => {} });
+
   // Initialize on first mount
   useEffect(() => {
     setBodies(generateRandomBodies(bodyCount, velocityScale, gravityScale));
@@ -63,6 +65,26 @@ export default function App() {
       if (b.id === id) {
         // Also update radius visually based on mass
         return { ...b, mass: newMass, radius: Math.cbrt(newMass) * 0.5 };
+      }
+      return b;
+    }));
+  };
+
+  const updateVelocity = (id: string, newVelocity: number) => {
+    physicsActions.current.updateVelocity(id, newVelocity);
+    setBodies(prev => prev.map(b => {
+      if (b.id === id) {
+        const currentMag = Math.sqrt(b.initialVelocity[0]**2 + b.initialVelocity[1]**2 + b.initialVelocity[2]**2);
+        if (currentMag < 0.0001) return b; // Avoid division by zero if it has no velocity
+        const scale = newVelocity / currentMag;
+        return {
+          ...b,
+          initialVelocity: [
+            b.initialVelocity[0] * scale,
+            b.initialVelocity[1] * scale,
+            b.initialVelocity[2] * scale,
+          ] as [number, number, number]
+        };
       }
       return b;
     }));
@@ -118,6 +140,7 @@ export default function App() {
                 gravityScale={gravityScale}
                 onCollision={handleCollision}
                 selectedBodyId={selectedBodyId}
+                physicsActions={physicsActions}
               />
             </Physics>
           </Suspense>
@@ -170,6 +193,7 @@ export default function App() {
         onToggleTrajectories={() => setShowTrajectories(!showTrajectories)}
         onToggleVelocities={() => setShowVelocities(!showVelocities)}
         onUpdateMass={updateMass}
+        onUpdateVelocity={updateVelocity}
       />
     </div>
   );
