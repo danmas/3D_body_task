@@ -1,0 +1,6 @@
+{
+  "name": "N-Body Physics Simulator",
+  "description": "3D visualization of the N-body problem using Rapier physics engine. Features adjustable masses, recording/replaying, and trajectory tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
