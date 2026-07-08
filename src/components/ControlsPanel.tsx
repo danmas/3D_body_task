@@ -209,13 +209,27 @@ export const ControlsPanel = ({
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: body.color }} />
                     <span className="text-xs font-medium">Body {idx + 1}</span>
                   </div>
-                  <span className="text-xs font-mono text-slate-400">m: {body.mass.toFixed(1)}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-mono text-slate-400">m:</span>
+                    <input 
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      value={parseFloat(body.mass.toFixed(2))}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (!isNaN(val) && val > 0) onUpdateMass(body.id, val);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-16 bg-slate-800 text-xs text-right border border-slate-700 rounded px-1 text-slate-200 outline-none focus:border-slate-500"
+                    />
+                  </div>
                 </div>
                 
                 <input
                   type="range"
                   min="0.1"
-                  max="20"
+                  max={body.mass > 50 ? 1000 : 50}
                   step="0.1"
                   value={body.mass}
                   onChange={(e) => onUpdateMass(body.id, parseFloat(e.target.value))}

@@ -114,6 +114,9 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
   const trajectories = useRef<Record<string, THREE.Vector3[]>>({});
   const [, setForceRender] = useState(0);
 
+  const frameCount = useRef(0);
+  const hasLoggedSetup = useRef(false);
+
   // Initialize trajectory arrays when bodies change
   useEffect(() => {
     trajectories.current = {};
@@ -124,7 +127,39 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
   }, [bodies]);
 
   useBeforePhysicsStep(() => {
-    if (!isRunning) return;
+    if (!isRunning) {
+      hasLoggedSetup.current = false;
+      return;
+    }
+
+    if (!hasLoggedSetup.current) {
+      console.log("=== N-BODY SIMULATION START ===");
+      console.log(`System: ${bodies.length} bodies`);
+      console.log(`Config: gravityScale=${gravityScale}`);
+      console.log("Logging positions and velocities (approx. every 1 real-time second)...");
+      console.log("===============================");
+      hasLoggedSetup.current = true;
+      frameCount.current = 0;
+    }
+
+    frameCount.current++;
+    
+    // Log every 60 steps
+    if (frameCount.current % 60 === 0) {
+        let logStr = `Step ${frameCount.current}: `;
+        for (let i = 0; i < bodies.length; i++) {
+            const b = bodies[i];
+            const rb = bodyRefs.current[b.id];
+            if (!rb) continue;
+            try {
+                const pos = rb.translation();
+                const vel = rb.linvel();
+                // Find index to use in log
+                logStr += `[${i}] p:${pos.x.toFixed(1)},${pos.y.toFixed(1)},${pos.z.toFixed(1)} v:${vel.x.toFixed(1)},${vel.y.toFixed(1)},${vel.z.toFixed(1)} | `;
+            } catch (e) {}
+        }
+        console.log(logStr);
+    }
     
     // Apply gravity between all pairs of bodies
     const keys = bodies.map(b => b.id);
