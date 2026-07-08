@@ -57,27 +57,31 @@ const VelocityArrow = ({ body, bodyRefs, isRunning }: { body: CelestialBody, bod
   useFrame(() => {
     const rb = bodyRefs.current[body.id];
     if (arrowRef.current && rb) {
-      const pos = rb.translation();
-      let v: THREE.Vector3;
+      try {
+        const pos = rb.translation();
+        let v: THREE.Vector3;
 
-      if (isRunning) {
-        const vel = rb.linvel();
-        v = new THREE.Vector3(vel.x, vel.y, vel.z);
-      } else {
-        v = new THREE.Vector3(...body.initialVelocity);
-      }
-      
-      const length = v.length();
-      
-      arrowRef.current.position.set(pos.x, pos.y, pos.z);
-      
-      if (length > 0.01) {
-        arrowRef.current.setDirection(v.clone().normalize());
-        // Scale the arrow length down a bit so it's not too huge
-        arrowRef.current.setLength(length * 0.5, Math.min(length * 0.1, 1), Math.min(length * 0.05, 0.5));
-        arrowRef.current.visible = true;
-      } else {
-        arrowRef.current.visible = false;
+        if (isRunning) {
+          const vel = rb.linvel();
+          v = new THREE.Vector3(vel.x, vel.y, vel.z);
+        } else {
+          v = new THREE.Vector3(...body.initialVelocity);
+        }
+        
+        const length = v.length();
+        
+        arrowRef.current.position.set(pos.x, pos.y, pos.z);
+        
+        if (length > 0.01) {
+          arrowRef.current.setDirection(v.clone().normalize());
+          // Scale the arrow length down a bit so it's not too huge
+          arrowRef.current.setLength(length * 0.5, Math.min(length * 0.1, 1), Math.min(length * 0.05, 0.5));
+          arrowRef.current.visible = true;
+        } else {
+          arrowRef.current.visible = false;
+        }
+      } catch (e) {
+        // Safe catch for accessing potentially destroyed bodies
       }
     }
   });
@@ -129,34 +133,38 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
       const rb1 = bodyRefs.current[b1.id];
       if (!rb1) continue;
 
-      const p1 = rb1.translation();
-      const pos1 = new THREE.Vector3(p1.x, p1.y, p1.z);
-      
-      const totalForce = new THREE.Vector3(0, 0, 0);
-
-      for (let j = 0; j < keys.length; j++) {
-        if (i === j) continue;
-        const b2 = bodies[j];
-        const rb2 = bodyRefs.current[b2.id];
-        if (!rb2) continue;
-
-        const p2 = rb2.translation();
-        const pos2 = new THREE.Vector3(p2.x, p2.y, p2.z);
-
-        const distVec = pos2.clone().sub(pos1);
-        const distanceSq = distVec.lengthSq();
+      try {
+        const p1 = rb1.translation();
+        const pos1 = new THREE.Vector3(p1.x, p1.y, p1.z);
         
-        // Softening parameter to avoid infinite forces at zero distance
-        // Increased softening to prevent extreme slingshots when bodies get close
-        const softDistSq = distanceSq + 15.0; 
+        const totalForce = new THREE.Vector3(0, 0, 0);
+
+        for (let j = 0; j < keys.length; j++) {
+          if (i === j) continue;
+          const b2 = bodies[j];
+          const rb2 = bodyRefs.current[b2.id];
+          if (!rb2) continue;
+
+          const p2 = rb2.translation();
+          const pos2 = new THREE.Vector3(p2.x, p2.y, p2.z);
+
+          const distVec = pos2.clone().sub(pos1);
+          const distanceSq = distVec.lengthSq();
+          
+          // Softening parameter to avoid infinite forces at zero distance
+          // Increased softening to prevent extreme slingshots when bodies get close
+          const softDistSq = distanceSq + 15.0; 
+          
+          const forceMagnitude = (G * b1.mass * b2.mass) / softDistSq;
+          const forceDir = distVec.normalize();
+          
+          totalForce.add(forceDir.multiplyScalar(forceMagnitude));
+        }
         
-        const forceMagnitude = (G * b1.mass * b2.mass) / softDistSq;
-        const forceDir = distVec.normalize();
-        
-        totalForce.add(forceDir.multiplyScalar(forceMagnitude));
+        rb1.addForce(totalForce, true);
+      } catch (e) {
+        // Safe catch for invalid rigid bodies
       }
-      
-      rb1.addForce(totalForce, true);
     }
   });
 
@@ -169,26 +177,66 @@ export const NBodySystem = ({ bodies, isRunning, showTrajectories, showVelocitie
       const id = keys[i];
       const rb = bodyRefs.current[id];
       if (rb && trajectories.current[id]) {
-        const p = rb.translation();
-        const points = trajectories.current[id];
-        
-        // Add new point. Limit max points to prevent memory leak
-        points.push(new THREE.Vector3(p.x, p.y, p.z));
-        if (points.length > 2000) {
-          points.shift();
+        try {
+          const p = rb.translation();
+          const points = trajectories.current[id];
+          
+          // Add new point. Limit max points to prevent memory leak
+          points.push(new THREE.Vector3(p.x, p.y, p.z));
+          if (points.length > 2000) {
+            points.shift();
+          }
+        } catch (e) {
+          // Safe catch for invalid rigid bodies
         }
       }
     }
   });
 
-  useFrame(() => {
+  const bodiesRef = useRef(bodies);
+  useEffect(() => {
+    bodiesRef.current = bodies;
+  }, [bodies]);
+
+  const lastTargetPos = useRef<THREE.Vector3 | null>(null);
+
+  useEffect(() => {
+    // Reset tracking position when selected body changes
+    lastTargetPos.current = null;
+  }, [selectedBodyId]);
+
+  useFrame((state) => {
     if (selectedBodyId && controls && (controls as any).target) {
+      // Prevent accessing bodies that have been removed/unmounted
+      if (!bodiesRef.current.some(b => b.id === selectedBodyId)) {
+        lastTargetPos.current = null;
+        return;
+      }
+
       const rb = bodyRefs.current[selectedBodyId];
       if (rb) {
-        const p = rb.translation();
-        (controls as any).target.lerp(new THREE.Vector3(p.x, p.y, p.z), 0.1);
-        (controls as any).update();
+        try {
+          const p = rb.translation();
+          const currentPos = new THREE.Vector3(p.x, p.y, p.z);
+          
+          if (lastTargetPos.current) {
+            // Tight tracking: move camera by the exact delta the object moved
+            const delta = currentPos.clone().sub(lastTargetPos.current);
+            state.camera.position.add(delta);
+          }
+          
+          // Firmly set the target to the object's position to avoid lagging
+          (controls as any).target.copy(currentPos);
+          (controls as any).update();
+          
+          lastTargetPos.current = currentPos;
+        } catch (e) {
+          // In case Rapier throws "recursive use of an object detected" due to unmounting
+          console.warn("Could not track body:", e);
+        }
       }
+    } else {
+      lastTargetPos.current = null;
     }
   });
 
