@@ -102,11 +102,11 @@ export default function App() {
   return (
     <div className="w-full h-screen bg-slate-950 flex overflow-hidden font-sans">
       <div className="flex-1 relative">
-        <Canvas camera={{ position: [0, 30, 50], fov: 45 }}>
+        <Canvas camera={{ position: [0, 150, 250], fov: 45, far: 50000 }}>
           <color attach="background" args={['#020617']} />
           <ambientLight intensity={0.2} />
           <pointLight position={[100, 100, 100]} intensity={1} />
-          <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+          <Stars radius={500} depth={200} count={10000} factor={6} saturation={0} fade speed={1} />
           
           <Suspense fallback={null}>
             <Physics gravity={[0, 0, 0]} timeStep={1/60 * timeScale} paused={!isRunning}>
@@ -122,7 +122,7 @@ export default function App() {
             </Physics>
           </Suspense>
           
-          <OrbitControls makeDefault />
+          <OrbitControls makeDefault maxDistance={10000} />
         </Canvas>
         
         {!isRunning && !isGameOver && (

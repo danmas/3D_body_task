@@ -25,14 +25,14 @@ export const generateRandomBodies = (count: number, velocityScale: number = 1, g
     
     // Star in the center, planets spread out
     const pos = isStar ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(
-      (Math.random() - 0.5) * 60,
-      (Math.random() - 0.5) * 5, // Very flat system
-      (Math.random() - 0.5) * 60
+      (Math.random() - 0.5) * 400,
+      (Math.random() - 0.5) * 10, // Very flat system
+      (Math.random() - 0.5) * 400
     );
     
     // Prevent planets from being too close to the star
-    if (!isStar && pos.length() < 10) {
-      pos.normalize().multiplyScalar(10 + Math.random() * 10);
+    if (!isStar && pos.length() < 30) {
+      pos.normalize().multiplyScalar(30 + Math.random() * 50);
     }
 
     bodies.push({
@@ -63,8 +63,8 @@ export const generateRandomBodies = (count: number, velocityScale: number = 1, g
     if (r === 0) continue;
 
     // Approximate circular orbit velocity magnitude: v = sqrt(G * M / r)
-    // We scale it down a bit for a more elliptical/stable look with multiple bodies
-    const vMag = Math.sqrt((G * totalMass) / r) * 0.45 * velocityScale;
+    // We scale it a bit for a more elliptical/stable look with multiple bodies
+    const vMag = Math.sqrt((G * totalMass) / r) * 0.85 * velocityScale;
 
     // Velocity direction perpendicular to distance vector and up vector
     const vDir = new THREE.Vector3().crossVectors(up, rVec).normalize();
